@@ -1,0 +1,104 @@
+# =============================================================================
+# ai-security-framework — Production-Grade AI Security Testing
+# PEP 621 metadata | Python >= 3.9
+# =============================================================================
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "ai-security-framework"
+version = "2.0.0"
+description = "Production-ready AI security testing framework covering OWASP LLM Top 10 with Promptfoo integration"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "RedKnight AI", email = "redknight@ai.com"},
+]
+maintainers = [
+    {name = "RedKnight AI", email = "redknight@ai.com"},
+]
+keywords = [
+    "ai-security",
+    "llm-security",
+    "prompt-injection",
+    "owasp",
+    "promptfoo",
+    "red-team",
+    "compliance",
+    "nist-ai-rmf",
+    "security-testing",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "promptfoo>=0.80.0",
+    "pyyaml>=6.0",
+    "requests>=2.28.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+ai-sec-scan = "ai_security.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/RedKnight-aj/ai-security-framework"
+Documentation = "https://github.com/RedKnight-aj/ai-security-framework/blob/main/docs/"
+Repository = "https://github.com/RedKnight-aj/ai-security-framework"
+Issues = "https://github.com/RedKnight-aj/ai-security-framework/issues"
+Changelog = "https://github.com/RedKnight-aj/ai-security-framework/releases"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ai_security = [
+    "data/*.json",
+    "data/*.yml",
+    "data/*.yaml",
+    "configs/**/*.yml",
+    "configs/**/*.yaml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
