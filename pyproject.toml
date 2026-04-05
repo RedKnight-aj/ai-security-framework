@@ -45,13 +45,15 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-    "promptfoo>=0.80.0",
     "pyyaml>=6.0",
     "requests>=2.28.0",
     "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
+engine = [
+    "promptfoo>=0.80",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",

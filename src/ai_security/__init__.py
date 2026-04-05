@@ -25,6 +25,14 @@ Example Usage::
 
 from __future__ import annotations
 
+# ------------------------------------------------------------------
+# CLI Engine — runs Promptfoo via subprocess (not direct import)
+# ------------------------------------------------------------------
+from .engine import (
+    PromptfooEngine,
+    PromptfooEvalResult,
+    PromptfooRedteamResult,
+)
 from .scanner import (
     Finding,
     SecurityScanner,
@@ -42,6 +50,10 @@ __author__ = "RedKnight AI"
 __license__ = "MIT"
 
 __all__ = [
+    # Engine (Promptfoo CLI wrapper)
+    "PromptfooEngine",
+    "PromptfooEvalResult",
+    "PromptfooRedteamResult",
     # Core classes
     "SecurityScanner",
     "RedTeam",

@@ -2,21 +2,22 @@
 Red Team — AI red-team attack simulation engine.
 
 The :class:`RedTeam` class orchestrates adversarial attack campaigns
-against an LLM endpoint.  It wraps ``promptfoo redteam`` when available,
-falling back to built-in attack patterns so it always produces results.
+against an LLM endpoint.  It delegates to :class:`PromptfooEngine`
+when the CLI is available, falling back to built-in attack patterns
+so it always produces results even without the engine installed.
 """
 
 from __future__ import annotations
 
-import subprocess
 import json
-import shutil
+import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .config import Settings
+from .engine import PromptfooEngine
 from .scanner import Finding, Severity, Vulnerability, VulnerabilityType
 
 
@@ -172,47 +173,39 @@ class RedTeam:
         self._target = target
         self._purpose = purpose
         self._settings = settings or Settings()
+        # Delegate CLI operations to the engine
+        self._engine = PromptfooEngine(
+            timeout=self._settings.timeout_sec,
+            promptfoo_path=self._settings.promptfoo_path,
+        )
 
     # ------------------------------------------------------------------
-    # Internal: locate promptfoo
+    # Dependency management
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _find_promptfoo() -> Optional[str]:
-        """Return path to promptfoo binary, or ``None`` if absent."""
-        return shutil.which("promptfoo")
+    def check_dependencies(self) -> Tuple[bool, str]:
+        """Check whether the Promptfoo CLI engine is available.
+
+        Returns:
+            ``(True, message)`` if available, ``(False, error_message)``.
+        """
+        return self._engine.check_dependencies()
 
     # ------------------------------------------------------------------
-    # Internal: run ``promptfoo redteam``
+    # Internal: run ``promptfoo redteam`` via engine
     # ------------------------------------------------------------------
 
     def _run_promptfoo_redteam(
         self,
         strategy: str = "default",
     ) -> Tuple[int, str, str]:
-        """Run ``promptfoo redteam`` as a subprocess.
+        """Run ``promptfoo redteam`` via the CLI engine.
 
         Returns:
             ``(returncode, stdout, stderr)``.
         """
-        promptfoo_bin = self._find_promptfoo()
-        if promptfoo_bin is None:
-            raise FileNotFoundError(
-                "promptfoo not found on PATH; install with: npm install -g promptfoo"
-            )
-        config = {
-            "description": f"Red-team scan for {self._target}",
-            "targets": [{"id": self._target}],
-            "strategies": [strategy],
-        }
-        cmd = [promptfoo_bin, "redteam", "generate"]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=self._settings.timeout_sec,
-        )
-        return result.returncode, result.stdout, result.stderr
+        result = self._engine.redteam(strategy=strategy)
+        return result.return_code, result.stdout, result.stderr
 
     # ------------------------------------------------------------------
     # Built-in attack generators (fallback)
@@ -351,8 +344,8 @@ class RedTeam:
         """Execute a red-team campaign.
 
         If Promptfoo is installed this method tries to run
-        ``promptfoo redteam``; otherwise it falls back to built-in
-        attack payloads.
+        ``promptfoo redteam`` via the CLI engine; otherwise it falls back
+        to built-in attack payloads.
 
         Args:
             plugins: Attack plugins to use (``default``, ``jailbreak``,
@@ -364,23 +357,20 @@ class RedTeam:
             List of :class:`Finding` objects representing attacks.
         """
         plugins = plugins or ["default"]
-        promptfoo = self._find_promptfoo()
+        available, _ = self._engine.check_dependencies()
 
-        # Try Promptfoo first
-        if promptfoo:
+        # Try Promptfoo engine first
+        if available:
             try:
                 strategy = strategies[0] if strategies else "default"
                 rc, _stdout, _stderr = self._run_promptfoo_redteam(strategy)
                 if rc == 0:
-                    # Promptfoo redteam succeeded; parse its output.
-                    # For now, return the built-in list as a safety net.
+                    # Promptfoo redteam succeeded; parsed output handled separately.
                     pass
-            except FileNotFoundError:
-                promptfoo = None
-            except subprocess.TimeoutExpired:
-                promptfoo = None
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                available = False
 
-        # Always run built-in generators
+        # Always run built-in generators as baseline
         all_findings: List[Finding] = []
         for plugin in plugins:
             if plugin in ("default", "injection"):

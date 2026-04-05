@@ -2,15 +2,14 @@
 Security Scanner — core vulnerability detection engine.
 
 The :class:`SecurityScanner` class drives all OWASP LLM Top 10 tests
-through **Promptfoo** (``promptfoo eval``).  It loads bundled YAML configs,
-runs subprocess evaluations, parses output, and returns structured
-:class:`Finding` objects.
+through **Promptfoo** (``promptfoo eval``) via the :class:`PromptfooEngine`
+CLI wrapper.  It loads bundled YAML configs, invokes the engine, parses
+output, and returns structured :class:`Finding` objects.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
@@ -18,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .config import Settings
+from .engine import PromptfooEngine
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -174,41 +174,34 @@ class SecurityScanner:
         self._settings = settings or Settings()
         if self._target:
             self._settings.target = self._target
+        # Delegate CLI operations to the engine
+        self._engine = PromptfooEngine(
+            timeout=self._settings.timeout_sec,
+            promptfoo_path=self._settings.promptfoo_path,
+        )
+
+    # ------------------------------------------------------------------
+    # Dependency management
+    # ------------------------------------------------------------------
+
+    def check_dependencies(self) -> Tuple[bool, str]:
+        """Check whether the Promptfoo CLI engine is available.
+
+        Returns:
+            ``(True, message)`` if available, ``(False, error_message)`` otherwise.
+        """
+        return self._engine.check_dependencies()
 
     # ------------------------------------------------------------------
     # High-level helpers
     # ------------------------------------------------------------------
-
-    def _find_promptfoo(self) -> str:
-        """Locate the Promptfoo binary.
-
-        Returns:
-            Absolute path to the executable.
-
-        Raises:
-            FileNotFoundError: If Promptfoo is not installed.
-        """
-        if self._settings.promptfoo_path:
-            candidate = Path(self._settings.promptfoo_path)
-            if candidate.is_file():
-                return str(candidate)
-            raise FileNotFoundError(
-                f"Promptfoo binary not found at '{self._settings.promptfoo_path}'"
-            )
-        binary = shutil.which("promptfoo")
-        if binary is None:
-            raise FileNotFoundError(
-                "Promptfoo is not installed or not on PATH.\n"
-                "Install it with:  npm install -g promptfoo"
-            )
-        return binary
 
     def run_promptfoo_eval(
         self,
         config_path: str | Path,
         output_path: Optional[str | Path] = None,
     ) -> Tuple[int, str, str]:
-        """Run ``promptfoo eval -c <config>`` as a subprocess.
+        """Run ``promptfoo eval -c <config>`` via the CLI engine.
 
         Args:
             config_path: Path to the YAML config to evaluate.
@@ -216,24 +209,9 @@ class SecurityScanner:
 
         Returns:
             Tuple of ``(return_code, stdout, stderr)``.
-
-        Raises:
-            FileNotFoundError: If Promptfoo is not installed.
-            subprocess.TimeoutExpired: If the evaluation exceeds the timeout.
         """
-        promptfoo_bin = self._find_promptfoo()
-        cmd: List[str] = [promptfoo_bin, "eval", "-c", str(config_path)]
-        if output_path:
-            cmd += ["-o", str(output_path)]
-            cmd += ["--output", "json"]
-
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=self._settings.timeout_sec,
-        )
-        return result.returncode, result.stdout, result.stderr
+        result = self._engine.eval(config_path=config_path, output_path=output_path)
+        return result.return_code, result.stdout, result.stderr
 
     def _parse_promptfoo_output(self, stdout: str, config_name: str) -> List[Finding]:
         """Parse JSON stdout from Promptfoo into :class:`Finding` objects.
